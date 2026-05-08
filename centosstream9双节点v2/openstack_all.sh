@@ -2,13 +2,87 @@
 ###############################################################################
 # OpenStack Dalmatian 一键部署总脚本
 # 运行位置: 控制节点
-# 执行方式: bash openstack_all.sh
 # 运行用户: root
+#
+# 本地运行:
+#   bash openstack_all.sh
+#
+# 远程一键运行:
+#   bash <(curl -sSL https://raw.githubusercontent.com/...) --keep    # 保留脚本
+#   bash <(curl -sSL https://raw.githubusercontent.com/...)           # 完成后清理
 ###############################################################################
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# ==================== 参数解析 ====================
+KEEP_SCRIPTS=0
+for arg in "$@"; do
+    case "$arg" in
+        --keep) KEEP_SCRIPTS=1 ;;
+    esac
+done
+
+# ==================== 自举: 检测并下载缺失脚本 ====================
+# GitHub 仓库地址 (可通过环境变量覆盖)
+GITHUB_REPO="${GITHUB_REPO:-Townrain/openstack-centos-stream9-dual-node}"
+GITHUB_REF="${GITHUB_REF:-main}"
+GITHUB_PATH="${GITHUB_PATH:-centosstream9双节点v2}"
+GITHUB_BASE="https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_REF}/${GITHUB_PATH}"
+
+# 尝试从当前目录检测脚本
+_CANDIDATE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
+if [ -n "${_CANDIDATE_DIR:-}" ] && [ -f "${_CANDIDATE_DIR}/openstack_common.sh" ]; then
+    SCRIPT_DIR="${_CANDIDATE_DIR}"
+    BOOTSTRAPPED=0
+else
+    SCRIPT_DIR="$(mktemp -d /tmp/openstack-deploy-XXXXXX)"
+    BOOTSTRAPPED=1
+
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║  检测到通过 curl 管道运行，正在从 GitHub 下载脚本...       ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo ""
+
+    SCRIPTS=(
+        openstack_common.sh
+        openstack_base_env.sh   openstack_verify.sh
+        openstack_keystone.sh   openstack_keystone_verify.sh
+        openstack_glance.sh     openstack_glance_verify.sh
+        openstack_placement.sh  openstack_placement_verify.sh
+        openstack_nova.sh       openstack_nova_verify.sh
+        openstack_neutron.sh    openstack_neutron_verify.sh
+        openstack_horizon.sh    openstack_horizon_verify.sh
+        openstack_cinder.sh     openstack_cinder_verify.sh
+        openstack_swift.sh      openstack_swift_verify.sh
+    )
+
+    for f in "${SCRIPTS[@]}"; do
+        printf "  下载 %s ... " "$f"
+        if curl -sSL --connect-timeout 10 "${GITHUB_BASE}/${f}" -o "${SCRIPT_DIR}/${f}" 2>/dev/null; then
+            echo "OK"
+        else
+            echo "失败"
+            echo ""
+            echo "  无法从 ${GITHUB_BASE} 下载脚本"
+            echo "  请检查网络或手动指定仓库:"
+            echo "    GITHUB_REPO=user/repo GITHUB_REF=main bash <(curl ...)"
+            exit 1
+        fi
+    done
+    chmod +x "${SCRIPT_DIR}"/*.sh
+    echo ""
+    echo "  所有脚本下载完成，开始部署..."
+    echo ""
+
+    # 退出时清理 (除非指定 --keep)
+    if [ "$KEEP_SCRIPTS" -eq 0 ]; then
+        _cleanup_dir="${SCRIPT_DIR}"
+        trap 'rm -rf "${_cleanup_dir}"' EXIT
+    fi
+fi
+
+# ==================== 加载公共库 ====================
 source "${SCRIPT_DIR}/openstack_common.sh"
 
 [ "$(id -u)" -ne 0 ] && { echo -e "${RED}请使用 root 账户运行${NC}"; exit 1; }
@@ -186,6 +260,18 @@ main() {
                 local lstatus; lstatus=$(echo "$r" | cut -d'|' -f2)
                 [ "$lstatus" = "${FAIL}" ] && echo "    bash openstack_all.sh  → 选择 [${lid}]"
             done
+        fi
+    fi
+
+    # 自举清理提示
+    if [ "${BOOTSTRAPPED:-0}" -eq 1 ]; then
+        if [ "$KEEP_SCRIPTS" -eq 1 ]; then
+            echo ""
+            echo -e "${YELLOW}脚本已保留在: ${SCRIPT_DIR}${NC}"
+        else
+            echo ""
+            echo -e "${YELLOW}脚本将在退出后自动清理。如需保留, 下次运行时加 --keep${NC}"
+            echo "  bash <(curl -sSL ...) --keep"
         fi
     fi
 }
