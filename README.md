@@ -5,7 +5,7 @@
 ## 一键部署
 
 ```bash
-bash <(curl -sSL https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/centosstream9双节点v2/openstack_all.sh)
+bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v2/openstack_all.sh")
 ```
 
 > 运行后选择 `[A]` 一键部署全部，第一个模块会交互式收集所有配置（密码、网络、存储），后续模块自动运行。
@@ -13,7 +13,7 @@ bash <(curl -sSL https://raw.githubusercontent.com/Townrain/openstack-centos-str
 ### 保留下载的脚本
 
 ```bash
-bash <(curl -sSL ...) --keep
+bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v2/openstack_all.sh") --keep
 ```
 
 ## 架构
@@ -91,7 +91,7 @@ bash openstack_all.sh → 选择 [V]
 通过环境变量指定其他分支或仓库：
 
 ```bash
-GITHUB_REPO=myuser/myfork GITHUB_REF=dev GITHUB_PATH=scripts bash <(curl -sSL ...)
+GITHUB_REPO=myuser/myfork GITHUB_REF=dev GITHUB_PATH=path/to/scripts bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v2/openstack_all.sh")
 ```
 
 ## 镜像上传
