@@ -1,184 +1,167 @@
-# OpenStack CentOS Stream 9 双节点部署脚本
+# OpenStack Dalmatian 双节点自动部署
 
-> 🚀 一套完整的 OpenStack 双节点自动化部署脚本，基于 CentOS Stream 9 环境。
+基于 CentOS Stream 9 的 OpenStack Dalmatian 双节点一键部署脚本，支持交互式和非交互式两种模式。
 
-## 📋 项目简介
-
-本项目提供了一套完整的 Shell 脚本集合，用于在 **CentOS Stream 9** 上自动化部署 **OpenStack** 双节点集群环境。所有脚本按照 OpenStack 官方文档的安装步骤进行编排，结构清晰、易于定制。
-
-## 🏗️ 架构概览
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    双节点架构                              │
-├─────────────────────────┬───────────────────────────────┤
-│       Controller 节点    │        Compute 节点            │
-│  ┌─────────────────────┐ │  ┌─────────────────────────┐  │
-│  │ Keystone (身份认证)  │ │  │ Nova Compute (计算)     │  │
-│  │ Glance (镜像服务)    │ │  │ Neutron Agent (网络)    │  │
-│  │ Placement (资源调度) │ │  │ Cinder Volume (存储)    │  │
-│  │ Nova (计算管理)      │ │  └─────────────────────────┘  │
-│  │ Neutron (网络管理)   │ │                                │
-│  │ Cinder (块存储)      │ │                                │
-│  │ Swift (对象存储)     │ │                                │
-│  │ Horizon (Web界面)    │ │                                │
-│  └─────────────────────┘ │                                │
-└─────────────────────────┴───────────────────────────────┘
-```
-
-## 📦 脚本列表
-
-### 🎯 主控脚本
-
-| 脚本 | 说明 |
-|------|------|
-| `openstack_all.sh` | **一键部署主脚本**，按顺序调用所有组件安装脚本 |
-| `openstack_verify.sh` | **总体验证脚本**，验证所有组件是否正常工作 |
-
-### 🔧 基础环境
-
-| 脚本 | 说明 |
-|------|------|
-| `openstack_base_env.sh` | 基础环境配置（网络、NTP、数据库、消息队列、Memcached 等） |
-
-### 🧩 核心组件
-
-| 组件 | 安装脚本 | 验证脚本 |
-|------|----------|----------|
-| **Keystone** (身份认证) | `openstack_keystone.sh` | `openstack_keystone_verify.sh` |
-| **Glance** (镜像服务) | `openstack_glance.sh` | `openstack_glance_verify.sh` |
-| **Placement** (资源调度) | `openstack_placement.sh` | `openstack_placement_verify.sh` |
-| **Nova** (计算服务) | `openstack_nova.sh` | `openstack_nova_verify.sh` |
-| **Neutron** (网络服务) | `openstack_neutron.sh` | `openstack_neutron_verify.sh` |
-| **Cinder** (块存储) | `openstack_cinder.sh` | `openstack_cinder_verify.sh` |
-| **Swift** (对象存储) | `openstack_swift.sh` | `openstack_swift_verify.sh` |
-| **Horizon** (Web 仪表盘) | `openstack_horizon.sh` | `openstack_horizon_verify.sh` |
-
-## 🚀 快速开始
-
-### 前提条件
-
-- **操作系统**: CentOS Stream 9 (两台节点)
-- **网络**: 管理网络 +  provider 网络
-- **硬件要求**:
-  - Controller 节点: 4GB+ RAM, 2 vCPU
-  - Compute 节点: 2GB+ RAM, 2 vCPU
-- **root 权限**: 所有脚本需以 root 用户执行
-
-### 节点规划
-
-| 节点 | 主机名 | IP 地址 (管理网络) |
-|------|--------|---------------------|
-| Controller | controller | 10.0.0.11 |
-| Compute | compute | 10.0.0.31 |
-
-### 一键部署
+## 一键部署
 
 ```bash
-# 1. 将脚本复制到 Controller 节点
-scp -r * root@10.0.0.11:/root/openstack/
-
-# 2. 登录 Controller 节点
-ssh root@10.0.0.11
-
-# 3. 执行一键部署
-cd /root/openstack
-chmod +x *.sh
-./openstack_all.sh
+bash <(curl -sSL https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/centosstream9双节点v2/openstack_all.sh)
 ```
 
-### 分步部署
+> 运行后选择 `[A]` 一键部署全部，第一个模块会交互式收集所有配置（密码、网络、存储），后续模块自动运行。
 
-如果需要分步安装和排错，可以按以下顺序执行：
+### 保留下载的脚本
 
 ```bash
-# 1. 基础环境配置
-./openstack_base_env.sh
-
-# 2. Keystone 身份服务
-./openstack_keystone.sh
-./openstack_keystone_verify.sh
-
-# 3. Glance 镜像服务
-./openstack_glance.sh
-./openstack_glance_verify.sh
-
-# 4. Placement 资源调度
-./openstack_placement.sh
-./openstack_placement_verify.sh
-
-# 5. Nova 计算服务
-./openstack_nova.sh
-./openstack_nova_verify.sh
-
-# 6. Neutron 网络服务
-./openstack_neutron.sh
-./openstack_neutron_verify.sh
-
-# 7. Cinder 块存储
-./openstack_cinder.sh
-./openstack_cinder_verify.sh
-
-# 8. Swift 对象存储 (可选)
-./openstack_swift.sh
-./openstack_swift_verify.sh
-
-# 9. Horizon Web 仪表盘
-./openstack_horizon.sh
-./openstack_horizon_verify.sh
-
-# 10. 总体验证
-./openstack_verify.sh
+bash <(curl -sSL ...) --keep
 ```
 
-## 📝 部署顺序
+## 架构
+
+| 节点 | 角色 | 网卡 |
+|------|------|------|
+| controller-63 | 控制节点（全部管理服务） | 管理(NAT) + 内部(Host-only) |
+| compute-63 | 计算+存储节点 | 管理(NAT) + 内部(Host-only) |
+
+## 部署组件
+
+| 序号 | 模块 | 端口 | 说明 |
+|------|------|------|------|
+| 01 | 基础环境 | — | 网络配置、SSH 免密、仓库、SELinux/防火墙 |
+| 02 | Keystone | 5000 | 身份认证服务 |
+| 03 | Glance | 9292 | 镜像服务 |
+| 04 | Placement | 8778 | 资源布局服务 |
+| 05 | Nova | 8774 | 计算服务 (控制节点 + 远程配置计算节点) |
+| 06 | Neutron | 9696 | 网络服务 (ML2/OVS/VXLAN) |
+| 07 | Horizon | 80/dashboard | Web 管理界面 |
+| 08 | Cinder | 8776 | 块存储 (支持 Loopback / 物理磁盘) |
+| 09 | Swift | 8080 | 对象存储 (支持 Loopback / 物理磁盘) |
+
+## 环境要求
+
+| 项目 | 要求 |
+|------|------|
+| 操作系统 | CentOS Stream 9 (最小化安装) |
+| 控制节点 | 4 vCPU, 8 GB RAM, 50 GB 磁盘 |
+| 计算节点 | 4 vCPU, 8 GB RAM, 50 GB 磁盘 |
+| 网络 | 2 张网卡（NAT + Host-only） |
+| 虚拟化 | Intel VT-x 或 AMD-V 已开启 |
+| 用户 | root |
+
+## 使用方式
+
+### 交互模式（单模块）
+
+```bash
+bash openstack_all.sh
+# 选择对应编号单独部署某模块，如 [02] Keystone
+```
+
+### 非交互模式（已有 openstack_env.conf）
+
+```bash
+bash openstack_keystone.sh --non-interactive
+```
+
+### 验证全部
+
+```bash
+bash openstack_all.sh → 选择 [V]
+```
+
+## 配置选项
+
+首次运行 `[A]` 或 `[01]` 基础环境时，会一次性收集以下配置：
+
+| 类别 | 选项 |
+|------|------|
+| 主机名 | 控制节点/计算节点 hostname |
+| 网络 | 管理网卡 IP/网关、内部网卡 IP（自动检测） |
+| 数据库 | MySQL root 密码 |
+| 管理密码 | admin 密码 (Keystone/Dashboard 登录) |
+| 服务密码 | 可选统一密码或逐服务单独设置 |
+| Metadata | 自动生成随机密钥 |
+| Cinder | Loopback 大小 / 物理磁盘路径 / 跳过 |
+| Swift | Loopback 大小 / 物理磁盘路径 / 跳过 |
+
+所有配置保存至 `/root/openstack_env.conf`，后续模块自动读取。
+
+## 自定义仓库
+
+通过环境变量指定其他分支或仓库：
+
+```bash
+GITHUB_REPO=myuser/myfork GITHUB_REF=dev GITHUB_PATH=scripts bash <(curl -sSL ...)
+```
+
+## 镜像上传
+
+部署完成后上传测试镜像：
+
+```bash
+source /root/admin-openrc
+openstack image create "cirros" \
+    --file /path/to/cirros-0.6.3-x86_64-disk.img \
+    --disk-format qcow2 \
+    --container-format bare \
+    --architecture x86_64 \
+    --public
+```
+
+## 常见问题
+
+**Q: 部署失败如何查看日志？**
+
+```bash
+journalctl -u <服务名> --no-pager -n 50
+tail -100 /var/log/nova/nova-api.log
+tail -100 /var/log/neutron/server.log
+```
+
+**Q: 如何重新运行失败的模块？**
+
+```bash
+bash openstack_all.sh → 选择对应编号
+```
+
+**Q: 计算节点 OVS 端口 DOWN？**
+
+```bash
+# 在计算节点执行
+ip link set <内部网卡> up
+systemctl restart neutron-openvswitch-agent openstack-nova-compute
+```
+
+**Q: Horizon 上传镜像后创建实例失败？**
+
+需设置镜像架构属性：
+```bash
+source /root/admin-openrc
+openstack image set --architecture x86_64 <镜像名>
+```
+
+## 文件说明
 
 ```
-openstack_base_env.sh        ← 基础环境（数据库、MQ、缓存等）
-        ↓
-openstack_keystone.sh        ← 身份认证服务
-        ↓
-openstack_glance.sh          ← 镜像服务
-        ↓
-openstack_placement.sh       ← 资源调度服务
-        ↓
-openstack_nova.sh            ← 计算服务
-        ↓
-openstack_neutron.sh         ← 网络服务
-        ↓
-openstack_cinder.sh          ← 块存储服务
-        ↓
-openstack_swift.sh           ← 对象存储服务（可选）
-        ↓
-openstack_horizon.sh         ← Web 管理界面
-        ↓
-openstack_verify.sh          ← 总体验证
+openstack_all.sh              # 总控脚本（支持 curl 管道自举）
+openstack_common.sh           # 公共库（颜色、日志、工具函数）
+openstack_base_env.sh         # 基础环境准备
+openstack_verify.sh           # 基础环境验证
+openstack_keystone.sh         # Keystone 安装
+openstack_keystone_verify.sh  # Keystone 验证
+openstack_glance.sh           # Glance 安装
+openstack_glance_verify.sh    # Glance 验证
+openstack_placement.sh        # Placement 安装
+openstack_placement_verify.sh # Placement 验证
+openstack_nova.sh             # Nova 安装（控制+计算节点）
+openstack_nova_verify.sh      # Nova 验证
+openstack_neutron.sh          # Neutron 安装（控制+计算节点）
+openstack_neutron_verify.sh   # Neutron 验证
+openstack_horizon.sh          # Horizon 安装
+openstack_horizon_verify.sh   # Horizon 验证
+openstack_cinder.sh           # Cinder 安装（控制+存储节点）
+openstack_cinder_verify.sh    # Cinder 验证
+openstack_swift.sh            # Swift 安装（控制+存储节点）
+openstack_swift_verify.sh     # Swift 验证
+README.md                     # 本文件
 ```
-
-## ⚙️ 配置说明
-
-所有脚本的变量配置集中在脚本文件头部，主要配置项包括：
-
-- `MANAGEMENT_INTERFACE_IP`: 管理网络 IP
-- `PROVIDER_INTERFACE_NAME`: Provider 网络接口名
-- `CONTROLLER_HOSTNAME`: Controller 节点主机名
-- `COMPUTE_HOSTNAME`: Compute 节点主机名
-- 各类密码和 Token
-
-请根据实际环境修改相应配置。
-
-## 🧪 验证
-
-每个组件脚本都配有对应的 `*_verify.sh` 验证脚本，用于检查该组件是否正确安装和运行。最终可通过 `openstack_verify.sh` 进行全面验证。
-
-## 📄 许可证
-
-MIT License
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
----
-
-**⚠️ 注意**: 本脚本集适用于学习和测试环境，生产环境部署请参考 [OpenStack 官方文档](https://docs.openstack.org/)。
