@@ -1,19 +1,50 @@
 # OpenStack Dalmatian 双节点自动部署
 
-基于 CentOS Stream 9 的 OpenStack Dalmatian 双节点一键部署脚本，支持交互式和非交互式两种模式。
+基于 CentOS Stream 9 的 OpenStack Dalmatian 双节点一键部署脚本，支持在线/离线两种模式，交互式和非交互式两种方式。
 
-## 一键部署
+## 一键部署（在线模式）
 
 ```bash
-bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v2/openstack_all.sh")
+bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v3/openstack_all.sh")
 ```
 
 > 运行后选择 `[A]` 一键部署全部，第一个模块会交互式收集所有配置（密码、网络、存储），后续模块自动运行。
 
+## 离线部署
+
+适用于无互联网环境。先在联网机器上构建离线 ISO，再传入目标环境部署。
+
+### 1. 构建离线 ISO
+
+在任意已配置 OpenStack Dalmatian 仓库的 CentOS Stream 9 机器上：
+
+```bash
+bash build-openstack-offline-iso.sh
+```
+
+输出 `/root/openstack-dalmatian-offline.iso`（约 600 MB）。需联网 + root + ~10 GB 磁盘。
+
+> ISO 含完整依赖（openssl、openssh、glibc 等），确保目标系统更新后 ssh 仍可用。
+
+### 2. 部署
+
+将 ISO 传入控制节点 `/root/`，运行一键脚本：
+
+```bash
+bash openstack_all.sh → [A]
+```
+
+首个模块选择 `[2] 离线部署`，输入 ISO 路径。脚本自动：
+- 挂载 ISO 并配置本地 yum 仓库
+- 备份并禁用外部网络源
+- 同步系统包（glibc/openssl/openssh 等）
+- 部署全部 OpenStack 组件
+- **部署完成后自动恢复网络源**
+
 ### 保留下载的脚本
 
 ```bash
-bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v2/openstack_all.sh") --keep
+bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v3/openstack_all.sh") --keep
 ```
 
 ## 架构
@@ -91,7 +122,7 @@ bash openstack_all.sh → 选择 [V]
 通过环境变量指定其他分支或仓库：
 
 ```bash
-GITHUB_REPO=myuser/myfork GITHUB_REF=dev GITHUB_PATH=path/to/scripts bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v2/openstack_all.sh")
+GITHUB_REPO=myuser/myfork GITHUB_REF=dev GITHUB_PATH=path/to/scripts bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v3/openstack_all.sh")
 ```
 
 ## 镜像上传
@@ -140,13 +171,24 @@ source /root/admin-openrc
 openstack image set --architecture x86_64 <镜像名>
 ```
 
+**Q: 离线部署时 ssh 报 `OpenSSL version mismatch`？**
+
+ISO 构建时已包含匹配的 `openssh-clients`，`dnf update` 同步系统后 ssh 应正常。若使用旧 ISO 出现该错误，重启后即可恢复。
+
+**Q: 离线部署完成后网络源未恢复？**
+
+脚本在全部模块部署完成后会自动调用 `restore_network_repos` 恢复 `/etc/yum.repos.d.backup/` 中的原始仓库。如未自动恢复，手动执行：
+```bash
+source /root/openstack_common.sh && restore_network_repos
+```
+
 ## 文件说明
 
 ```
 openstack_all.sh              # 总控脚本（支持 curl 管道自举）
-openstack_common.sh           # 公共库（颜色、日志、工具函数）
-openstack_base_env.sh         # 基础环境准备
-openstack_verify.sh           # 基础环境验证
+openstack_common.sh           # 公共库（颜色、日志、工具函数、离线仓库/恢复）
+openstack_base_env.sh         # 基础环境准备（在线/离线双模式）
+openstack_verify.sh           # 基础环境验证（离线模式自动跳过不适用的检查）
 openstack_keystone.sh         # Keystone 安装
 openstack_keystone_verify.sh  # Keystone 验证
 openstack_glance.sh           # Glance 安装
@@ -163,5 +205,6 @@ openstack_cinder.sh           # Cinder 安装（控制+存储节点）
 openstack_cinder_verify.sh    # Cinder 验证
 openstack_swift.sh            # Swift 安装（控制+存储节点）
 openstack_swift_verify.sh     # Swift 验证
+build-openstack-offline-iso.sh # 离线 ISO 构建脚本
 README.md                     # 本文件
 ```
