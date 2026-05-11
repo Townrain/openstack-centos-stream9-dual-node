@@ -8,7 +8,10 @@
 bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v3/openstack_all.sh")
 ```
 
-> 脚本自动从 GitHub 拉取全部依赖脚本到 `/root/`，然后启动一键部署。首次运行会自动下载，后续运行跳过已存在的脚本。
+> 脚本自动从 GitHub 下载全部依赖到临时目录。加 `--keep` 保留脚本到本地：
+> ```bash
+> bash <(curl -sSL "https://raw.githubusercontent.com/.../v3/openstack_all.sh") --keep
+> ```
 
 ## 离线部署
 
