@@ -8,7 +8,7 @@
 bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v3/openstack_all.sh")
 ```
 
-> 运行后选择 `[A]` 一键部署全部，第一个模块会交互式收集所有配置（密码、网络、存储），后续模块自动运行。
+> 脚本自动从 GitHub 拉取全部依赖脚本到 `/root/`，然后启动一键部署。首次运行会自动下载，后续运行跳过已存在的脚本。
 
 ## 离线部署
 
@@ -41,65 +41,6 @@ bash openstack_all.sh → [A]
 - 部署全部 OpenStack 组件
 - **部署完成后自动恢复网络源**
 
-### 保留下载的脚本
-
-```bash
-bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v3/openstack_all.sh") --keep
-```
-
-## 架构
-
-| 节点 | 角色 | 网卡 |
-|------|------|------|
-| controller-63 | 控制节点（全部管理服务） | 管理(NAT) + 内部(Host-only) |
-| compute-63 | 计算+存储节点 | 管理(NAT) + 内部(Host-only) |
-
-## 部署组件
-
-| 序号 | 模块 | 端口 | 说明 |
-|------|------|------|------|
-| 01 | 基础环境 | — | 网络配置、SSH 免密、仓库、SELinux/防火墙 |
-| 02 | Keystone | 5000 | 身份认证服务 |
-| 03 | Glance | 9292 | 镜像服务 |
-| 04 | Placement | 8778 | 资源布局服务 |
-| 05 | Nova | 8774 | 计算服务 (控制节点 + 远程配置计算节点) |
-| 06 | Neutron | 9696 | 网络服务 (ML2/OVS/VXLAN) |
-| 07 | Horizon | 80/dashboard | Web 管理界面 |
-| 08 | Cinder | 8776 | 块存储 (支持 Loopback / 物理磁盘) |
-| 09 | Swift | 8080 | 对象存储 (支持 Loopback / 物理磁盘) |
-
-## 环境要求
-
-| 项目 | 要求 |
-|------|------|
-| 操作系统 | CentOS Stream 9 (最小化安装) |
-| 控制节点 | 4 vCPU, 8 GB RAM, 50 GB 磁盘 |
-| 计算节点 | 4 vCPU, 8 GB RAM, 50 GB 磁盘 |
-| 网络 | 2 张网卡（NAT + Host-only） |
-| 虚拟化 | Intel VT-x 或 AMD-V 已开启 |
-| 用户 | root |
-
-## 使用方式
-
-### 交互模式（单模块）
-
-```bash
-bash openstack_all.sh
-# 选择对应编号单独部署某模块，如 [02] Keystone
-```
-
-### 非交互模式（已有 openstack_env.conf）
-
-```bash
-bash openstack_keystone.sh --non-interactive
-```
-
-### 验证全部
-
-```bash
-bash openstack_all.sh → 选择 [V]
-```
-
 ## 配置选项
 
 首次运行 `[A]` 或 `[01]` 基础环境时，会一次性收集以下配置：
@@ -122,7 +63,7 @@ bash openstack_all.sh → 选择 [V]
 通过环境变量指定其他分支或仓库：
 
 ```bash
-GITHUB_REPO=myuser/myfork GITHUB_REF=dev GITHUB_PATH=path/to/scripts bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v3/openstack_all.sh")
+GITHUB_REPO=myuser/myfork GITHUB_REF=dev GITHUB_PATH=v3 bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v3/openstack_all.sh")
 ```
 
 ## 镜像上传
