@@ -1,6 +1,6 @@
 #!/bin/bash
 ###############################################################################
-# OpenStack Dalmatian 一键部署总脚本
+# OpenStack Dalmatian 一键部署总脚本  v3
 # 运行位置: 控制节点
 # 执行方式: bash openstack_all.sh
 # 运行用户: root
@@ -8,7 +8,58 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# ==================== 自举: 从 GitHub 拉取全部脚本 ====================
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_BOOTSTRAP_NEEDED=0
+_SELF_NAME="$(basename "${BASH_SOURCE[0]}")"
+
+# 检测: 如果是通过 curl 管道执行 (脚本不在本地目录) 或缺少关键脚本
+if [[ "${BASH_SOURCE[0]}" == /dev/fd/* ]] || [[ "${BASH_SOURCE[0]}" == bash ]] || [ ! -f "${_SCRIPT_DIR}/openstack_common.sh" ]; then
+    _BOOTSTRAP_NEEDED=1
+fi
+
+_GH_REPO="${GITHUB_REPO:-Townrain/openstack-centos-stream9-dual-node}"
+_GH_REF="${GITHUB_REF:-main}"
+_GH_PATH="${GITHUB_PATH:-v3}"
+
+_bootstrap() {
+    echo "==> 正在从 GitHub 拉取全部部署脚本到 /root/ ..."
+    local _base="https://raw.githubusercontent.com/${_GH_REPO}/${_GH_REF}/${_GH_PATH}"
+    local _scripts=(
+        openstack_common.sh   openstack_base_env.sh   openstack_verify.sh
+        openstack_keystone.sh openstack_keystone_verify.sh
+        openstack_glance.sh   openstack_glance_verify.sh
+        openstack_placement.sh openstack_placement_verify.sh
+        openstack_nova.sh     openstack_nova_verify.sh
+        openstack_neutron.sh  openstack_neutron_verify.sh
+        openstack_horizon.sh  openstack_horizon_verify.sh
+        openstack_cinder.sh   openstack_cinder_verify.sh
+        openstack_swift.sh    openstack_swift_verify.sh
+        build-openstack-offline-iso.sh
+    )
+    for _s in "${_scripts[@]}"; do
+        [ "$_s" = "$_SELF_NAME" ] && continue
+        if [ -f "/root/${_s}" ] && [[ "${1:-}" != "--force" ]]; then
+            echo "  ${_s} [已存在，跳过]"
+            continue
+        fi
+        echo "  下载 ${_s} ..."
+        curl -sSL "${_base}/${_s}" -o "/root/${_s}" || { echo "  失败: ${_s}"; exit 1; }
+    done
+    # 把自己也复制到 /root/
+    if [ "${BASH_SOURCE[0]}" != "/root/${_SELF_NAME}" ]; then
+        cp "${BASH_SOURCE[0]}" "/root/${_SELF_NAME}" 2>/dev/null || true
+    fi
+    chmod +x /root/*.sh
+    echo "==> 脚本已就绪"
+}
+
+if [ "$_BOOTSTRAP_NEEDED" -eq 1 ]; then
+    _bootstrap "${1:-}"
+    SCRIPT_DIR="/root"
+else
+    SCRIPT_DIR="$_SCRIPT_DIR"
+fi
 source "${SCRIPT_DIR}/openstack_common.sh"
 
 [ "$(id -u)" -ne 0 ] && { echo -e "${RED}请使用 root 账户运行${NC}"; exit 1; }
