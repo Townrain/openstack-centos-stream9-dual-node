@@ -1,6 +1,6 @@
 #!/bin/bash
 ###############################################################################
-# OpenStack Dalmatian 一键部署总脚本  v3
+# OpenStack Dalmatian 一键部署总脚本  v4
 # 运行位置: 控制节点
 # 运行用户: root
 #
@@ -8,8 +8,8 @@
 #   bash openstack_all.sh
 #
 # 远程一键运行:
-#   bash <(curl -sSL https://raw.githubusercontent.com/.../v3/openstack_all.sh) --keep
-#   bash <(curl -sSL https://raw.githubusercontent.com/.../v3/openstack_all.sh)
+#   bash <(curl -sSL https://raw.githubusercontent.com/.../v4/openstack_all.sh) --keep
+#   bash <(curl -sSL https://raw.githubusercontent.com/.../v4/openstack_all.sh)
 ###############################################################################
 
 set -euo pipefail
@@ -25,7 +25,7 @@ done
 # ==================== 自举: 检测并下载缺失脚本 ====================
 GITHUB_REPO="${GITHUB_REPO:-Townrain/openstack-centos-stream9-dual-node}"
 GITHUB_REF="${GITHUB_REF:-main}"
-GITHUB_PATH="${GITHUB_PATH:-v3}"
+GITHUB_PATH="${GITHUB_PATH:-v4}"
 GITHUB_BASE="https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_REF}/${GITHUB_PATH}"
 
 _CANDIDATE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
@@ -104,7 +104,7 @@ RESULTS=()
 show_menu() {
     echo ""
     echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║     OpenStack Dalmatian 一键部署 (CentOS Stream 9)  v3     ║"
+    echo "║     OpenStack Dalmatian 一键部署 (CentOS Stream 9)  v4     ║"
     echo "╠══════════════════════════════════════════════════════════════╣"
     echo "║  模块:                                                      ║"
     for m in "${MODULES[@]}"; do
