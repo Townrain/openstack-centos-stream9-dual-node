@@ -5,12 +5,12 @@
 ## 一键部署（在线模式）
 
 ```bash
-bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v3/openstack_all.sh")
+bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v4/openstack_all.sh")
 ```
 
 > 脚本自动从 GitHub 下载全部依赖到临时目录。加 `--keep` 保留脚本到本地：
 > ```bash
-> bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v3/openstack_all.sh") --keep
+> bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v4/openstack_all.sh") --keep
 > ```
 
 ## 离线部署
