@@ -61,6 +61,8 @@ load_env_common() {
     INT_IP="${INT_IP:-}"
     INT_IFACE="${INT_IFACE:-}"
     COMPUTE_INT_IFACE="${COMPUTE_INT_IFACE:-}"
+    # 外部网络变量（用于控制节点 br-provider）
+    EXT_IP="${EXT_IP:-}"
     # 离线模式
     OFFLINE_REPO_PATH="${OFFLINE_REPO_PATH:-}"
 }

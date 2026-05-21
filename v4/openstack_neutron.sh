@@ -120,9 +120,9 @@ NMEOF
 
     # 确保重启后 OVS 桥端口自动 UP
     mkdir -p /etc/systemd/system/openvswitch.service.d
-    cat > /etc/systemd/system/openvswitch.service.d/ovs-br-provider-up.conf << NMEOF
+    cat > "/etc/systemd/system/openvswitch.service.d/ovs-br-provider-up.conf" << NMEOF
 [Service]
-ExecStartPost=/usr/bin/bash -c "ip link set ${int_iface:-ens34} up; ip link set br-provider up"
+ExecStartPost=/usr/bin/bash -c "ip link set ${int_iface:-ens34} up; ip link set br-provider up; ip link set br-int up; ip link set br-tun up"
 NMEOF
     systemctl daemon-reload
     log_info "已添加 OVS 桥开机自启"
@@ -155,6 +155,20 @@ EOF
     sysctl -w net.ipv4.ip_forward=1 2>/dev/null || true
     grep -q "net.ipv4.ip_forward" /etc/sysctl.conf 2>/dev/null || echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
     log_info "IP 转发已开启: $(sysctl -n net.ipv4.ip_forward)"
+
+    # 等待 br-int 和 br-tun 网桥创建
+    log_info "等待 OVS 网桥 br-int 和 br-tun 创建..."
+    for i in $(seq 1 10); do
+        if ovs-vsctl br-exists br-int 2>/dev/null && ovs-vsctl br-exists br-tun 2>/dev/null; then
+            log_info "br-int 和 br-tun 网桥已创建"
+            break
+        fi
+        sleep 2
+    done
+
+    # 确保 br-int 和 br-tun 网桥状态为 up
+    ip link set br-int up 2>/dev/null || true
+    ip link set br-tun up 2>/dev/null || true
 
     log_info "计算节点 Neutron 配置完成"
 }
@@ -346,18 +360,35 @@ NMEOF
     ovs-vsctl add-port br-provider "${INT_IFACE}" 2>/dev/null || true
     ip link set "${INT_IFACE}" up 2>/dev/null || true
     ip link set br-provider up 2>/dev/null || true
+
+    # 控制节点 br-provider 需要配置外部 IP（用于 Swift 等服务）
+    # 计算节点 br-provider 只做桥接，不需要 IP
+    if [ -n "${EXT_IP:-}" ]; then
+        # 确保 IP 包含子网掩码（默认 /24）
+        local ext_ip_with_mask="${EXT_IP}"
+        if [[ "$ext_ip_with_mask" != */* ]]; then
+            ext_ip_with_mask="${ext_ip_with_mask}/24"
+            log_info "自动添加子网掩码: ${ext_ip_with_mask}"
+        fi
+        ip addr flush dev br-provider 2>/dev/null || true
+        ip addr add "${ext_ip_with_mask}" dev br-provider 2>/dev/null || true
+        log_info "br-provider 已配置外部 IP: ${ext_ip_with_mask}"
+    else
+        log_info "br-provider 未配置外部 IP（计算节点无需配置）"
+    fi
+
     ovs-vsctl show
     log_info "OVS 网桥 br-provider 已创建"
     log_info "VXLAN 隧道 IP: local_ip=${CONTROLLER_IP} (管理网卡)"
 
     # 确保重启后 OVS 桥端口自动 UP
     mkdir -p /etc/systemd/system/openvswitch.service.d
-    cat > /etc/systemd/system/openvswitch.service.d/ovs-br-provider-up.conf << NMEOF
+    cat > "/etc/systemd/system/openvswitch.service.d/ovs-br-provider-up.conf" << NMEOF
 [Service]
-ExecStartPost=/usr/bin/bash -c "ip link set ${INT_IFACE} up; ip link set br-provider up"
+ExecStartPost=/usr/bin/bash -c "ip link set ${INT_IFACE} up; ip link set br-provider up; ip link set br-int up; ip link set br-tun up"
 NMEOF
     systemctl daemon-reload
-    log_info "已添加 OVS 桥开机自启 (${INT_IFACE} + br-provider)"
+    log_info "已添加 OVS 桥开机自启 (${INT_IFACE} + br-provider + br-int + br-tun)"
 }
 
 configure_l3_agent() {
@@ -484,6 +515,20 @@ start_neutron_services() {
         sleep 2
     done
 
+    # 等待 br-int 和 br-tun 网桥创建
+    log_info "等待 OVS 网桥 br-int 和 br-tun 创建..."
+    for i in $(seq 1 10); do
+        if ovs-vsctl br-exists br-int 2>/dev/null && ovs-vsctl br-exists br-tun 2>/dev/null; then
+            log_info "br-int 和 br-tun 网桥已创建"
+            break
+        fi
+        sleep 2
+    done
+
+    # 确保 br-int 和 br-tun 网桥状态为 up
+    ip link set br-int up 2>/dev/null || true
+    ip link set br-tun up 2>/dev/null || true
+
     # 重启可能未注册的 agent
     for agt in neutron-dhcp-agent neutron-metadata-agent neutron-l3-agent; do
         systemctl restart "$agt" 2>/dev/null || true
@@ -524,6 +569,7 @@ interactive_main() {
         CONTROLLER_IP="${CONTROLLER_IP:-${detected_mgmt}}"
         INT_IP="${INT_IP:-${detected_int}}"
         INT_IFACE="${INT_IFACE:-${detected_int_iface}}"
+        EXT_IP="${EXT_IP:-}"
         NEUTRON_PASS="${NEUTRON_PASS:-${SERVICE_PASS}}"
         RABBIT_PASS="${RABBIT_PASS:-${NEUTRON_PASS}}"
         NOVA_PASS="${NOVA_PASS:-${NEUTRON_PASS}}"
@@ -534,6 +580,7 @@ interactive_main() {
         read -r -p "管理IP [${detected_mgmt}]: " input; CONTROLLER_IP="${input:-${detected_mgmt}}"
         read -r -p "内部IP (VXLAN隧道) [${detected_int}]: " input; INT_IP="${input:-${detected_int}}"
         read -r -p "内部网卡 [${detected_int_iface}]: " input; INT_IFACE="${input:-${detected_int_iface}}"
+        read -r -p "外部IP (br-provider) [${EXT_IP:-}]: " input; EXT_IP="${input:-${EXT_IP:-}}"
 
         echo ""
         echo "========== 计算节点 =========="

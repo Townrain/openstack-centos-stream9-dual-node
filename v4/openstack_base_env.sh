@@ -368,6 +368,7 @@ COMPUTE_USER="${COMPUTE_USER:-root}"
 # ========== 网络 ==========
 INT_IP="${CTRL_INT_IP:-}"
 INT_IFACE="${CTRL_INT_IFACE:-}"
+EXT_IP="${CTRL_EXT_IP:-}"
 COMPUTE_INT_IFACE="${COMPUTE_INT_IFACE:-}"
 COMPUTE_MGMT_IFACE="${COMPUTE_MGMT_IFACE:-}"
 COMPUTE_INT_IP="${COMPUTE_INT_IP:-}"
@@ -608,6 +609,18 @@ auto_detect_local_network() {
     read -r -p "内部网关 [${int_gw:-无}]: " input
     int_gw="${input:-$int_gw}"
 
+    # 外部网络 IP（用于 br-provider，实例通过此网络访问外部）
+    echo ""
+    echo "  外部网络 IP（用于 br-provider，实例访问外部网络）"
+    echo "  格式: IP/掩码，例如 192.168.252.250/24"
+    read -r -p "外部IP [${EXT_IP:-未配置}]: " input
+    EXT_IP="${input:-${EXT_IP:-}}"
+    # 如果用户输入的 IP 没有子网掩码，自动添加 /24
+    if [ -n "$EXT_IP" ] && [[ "$EXT_IP" != */* ]]; then
+        EXT_IP="${EXT_IP}/24"
+        log_info "自动添加子网掩码: ${EXT_IP}"
+    fi
+
     CTRL_MGMT_IFACE="$mgmt_iface"
     CTRL_MGMT_IP="$mgmt_ip"
     CTRL_MGMT_PREFIX="$mgmt_prefix"
@@ -616,6 +629,7 @@ auto_detect_local_network() {
     CTRL_INT_IP="$int_ip"
     CTRL_INT_PREFIX="$int_prefix"
     CTRL_INT_GW="$int_gw"
+    CTRL_EXT_IP="$EXT_IP"
 }
 
 # ==================== 自动检测计算节点远程网络 ====================
@@ -953,6 +967,7 @@ interactive_main() {
     echo "  [控制节点] ${CTRL_HOSTNAME}"
     echo "    管理: ${CTRL_MGMT_IFACE}  ${CTRL_MGMT_IP}/${CTRL_MGMT_PREFIX}  网关: ${CTRL_MGMT_GW}"
     echo "    内部: ${CTRL_INT_IFACE}  ${CTRL_INT_IP}/${CTRL_INT_PREFIX}  网关: ${CTRL_INT_GW}"
+    [ -n "${CTRL_EXT_IP:-}" ] && echo "    外部: ${CTRL_INT_IFACE}  ${CTRL_EXT_IP}  (br-provider)"
     echo ""
     echo "  [计算节点] ${COMPUTE_HOSTNAME}"
     echo "    管理: ${COMPUTE_MGMT_IFACE}  ${COMPUTE_MGMT_IP}/${COMPUTE_MGMT_PREFIX}  网关: ${COMPUTE_MGMT_GW}"

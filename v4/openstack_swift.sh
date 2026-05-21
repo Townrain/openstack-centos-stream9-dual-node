@@ -400,6 +400,7 @@ verify_swift() {
         log_info "swift stat 通过"
     else
         log_warn "swift stat 失败（存储节点可能尚未就绪）"
+        return 1
     fi
 
     echo ""
@@ -418,6 +419,114 @@ verify_swift() {
         cat /tmp/swift-downloaded.txt 2>/dev/null || log_warn "下载功能测试未通过"
         log_info "功能测试完成"
     fi
+
+    # TempURL 测试
+    test_tempurl
+}
+
+test_tempurl() {
+    log_step "7. TempURL 测试"
+
+    local have_credentials=false
+    [ -f /root/admin-openrc ] && { source /root/admin-openrc 2>/dev/null; have_credentials=true; }
+
+    if ! $have_credentials; then
+        log_warn "无法加载 admin-openrc，跳过 TempURL 测试"
+        return 1
+    fi
+
+    # 获取 Swift 服务 IP（使用外部 IP 或控制节点 IP）
+    local swift_ip="${EXT_IP:-${CONTROLLER_IP}}"
+    # 去掉子网掩码
+    swift_ip="${swift_ip%%/*}"
+
+    # 设置账户元数据（TempURL 密钥）
+    log_info "设置 TempURL 密钥..."
+    local temp_url_key="my-secret-key-$(date +%Y)"
+    swift post -m "Temp-URL-Key:${temp_url_key}" 2>/dev/null || {
+        log_warn "设置 TempURL 密钥失败"
+        return 1
+    }
+
+    # 验证密钥已设置
+    if swift stat 2>/dev/null | grep -q "Temp-Url-Key"; then
+        log_info "TempURL 密钥设置成功"
+    else
+        log_warn "TempURL 密钥未生效"
+        return 1
+    fi
+
+    # 创建测试容器和对象
+    log_info "创建测试容器和对象..."
+    swift post test-container 2>/dev/null || true
+    echo "smoke test $(date)" | swift upload test-container - --object-name tmp/test.txt 2>/dev/null || {
+        log_warn "上传测试对象失败"
+        return 1
+    }
+
+    # 获取 Account ID
+    local account_id
+    account_id=$(swift stat 2>/dev/null | awk '/^\s+Account:/ {print $2}')
+    if [ -z "$account_id" ]; then
+        log_warn "无法获取 Account ID"
+        return 1
+    fi
+    log_info "Account ID: ${account_id}"
+
+    # 生成 GET 临时 URL
+    local get_url
+    get_url=$(swift tempurl GET 3600 "/v1/${account_id}/test-container/tmp/test.txt" "${temp_url_key}" 2>/dev/null)
+    if [ -z "$get_url" ]; then
+        log_warn "生成 GET 临时 URL 失败"
+        return 1
+    fi
+    # 添加完整 URL
+    get_url="http://${swift_ip}:8080${get_url}"
+
+    # 生成 PUT 临时 URL
+    local put_url
+    put_url=$(swift tempurl PUT 3600 "/v1/${account_id}/test-container/from-instance.txt" "${temp_url_key}" 2>/dev/null)
+    if [ -z "$put_url" ]; then
+        log_warn "生成 PUT 临时 URL 失败"
+        return 1
+    fi
+    # 添加完整 URL
+    put_url="http://${swift_ip}:8080${put_url}"
+
+    # 本地验证下载
+    log_info "验证 GET TempURL..."
+    if curl -sf "$get_url" > /dev/null 2>&1; then
+        log_info "GET TempURL 验证通过"
+    else
+        log_warn "GET TempURL 验证失败"
+    fi
+
+    # 本地验证上传
+    log_info "验证 PUT TempURL..."
+    if echo "local upload test $(date)" | curl -sf -X PUT -T - "$put_url" 2>/dev/null; then
+        log_info "PUT TempURL 验证通过"
+    else
+        log_warn "PUT TempURL 验证失败"
+    fi
+
+    # 输出实例侧命令
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║  TempURL 测试命令（复制到实例中执行）                       ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo ""
+    echo "# === 复制以下内容到你的实例中执行 ==="
+    echo "GET_URL='${get_url}'"
+    echo "PUT_URL='${put_url}'"
+    echo "# 下载测试"
+    echo "wget -O /tmp/downloaded.txt \"\$GET_URL\" && cat /tmp/downloaded.txt"
+    echo "# 上传测试"
+    echo "echo \"hello from instance \$(date)\" > /tmp/up.txt"
+    echo "curl -X PUT -T /tmp/up.txt \"\$PUT_URL\""
+    echo ""
+    echo "# === 或直接执行 ==="
+    echo "wget -O /tmp/downloaded.txt '${get_url}' && cat /tmp/downloaded.txt"
+    echo ""
 }
 
 # ==================== 主流程 ====================
