@@ -34,12 +34,28 @@ jobs:
           dnf install -y dnf-plugins-core createrepo_c genisoimage wget
           dnf install -y sudo
 
-      # 3. 运行 ISO 构建脚本
+      # 3. 查找脚本位置并运行 ISO 构建
       - name: Build offline ISO
         run: |
+          # 查找 build-openstack-offline-iso.sh 的位置
+          SCRIPT_PATH=$(find $GITHUB_WORKSPACE -name "build-openstack-offline-iso.sh" -type f 2>/dev/null | head -1)
+          
+          if [ -z "$SCRIPT_PATH" ]; then
+            echo "::error::build-openstack-offline-iso.sh not found"
+            ls -la $GITHUB_WORKSPACE/
+            exit 1
+          fi
+          
+          # 切换到脚本所在目录
+          SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+          cd "$SCRIPT_DIR"
+          echo "Script found at: $SCRIPT_PATH"
+          echo "Working directory: $(pwd)"
+          ls -la
+          
+          # 运行构建脚本
           chmod +x build-openstack-offline-iso.sh
           bash build-openstack-offline-iso.sh
-        
       # 4. 获取 ISO 文件信息
       - name: Get ISO info
         id: iso_info
