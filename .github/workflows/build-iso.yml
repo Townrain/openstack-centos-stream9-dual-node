@@ -1,0 +1,127 @@
+name: Build Offline ISO
+
+# 触发条件：推送 tag 时运行
+on:
+  push:
+    tags:
+      - 'v*'
+
+# 权限：需要写入 Release
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build OpenStack Offline ISO
+    runs-on: ubuntu-latest
+    
+    # 使用 CentOS Stream 9 容器（确保 RPM 包兼容性）
+    container:
+      image: quay.io/centos/centos:stream9
+      options: --privileged
+    
+    # 超时时间：ISO 构建可能需要较长时间
+    timeout-minutes: 60
+    
+    steps:
+      # 1. 检出代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. 安装构建依赖
+      - name: Install build dependencies
+        run: |
+          dnf install -y dnf-plugins-core createrepo_c genisoimage wget
+          dnf install -y sudo
+
+      # 3. 运行 ISO 构建脚本
+      - name: Build offline ISO
+        run: |
+          chmod +x build-openstack-offline-iso.sh
+          bash build-openstack-offline-iso.sh
+        
+      # 4. 获取 ISO 文件信息
+      - name: Get ISO info
+        id: iso_info
+        run: |
+          ISO_PATH="/root/openstack-dalmatian-offline.iso"
+          if [ -f "$ISO_PATH" ]; then
+            ISO_SIZE=$(du -h "$ISO_PATH" | cut -f1)
+            ISO_SHA256=$(sha256sum "$ISO_PATH" | cut -d' ' -f1)
+            echo "path=$ISO_PATH" >> $GITHUB_OUTPUT
+            echo "size=$ISO_SIZE" >> $GITHUB_OUTPUT
+            echo "sha256=$ISO_SHA256" >> $GITHUB_OUTPUT
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "::error::ISO file not found at $ISO_PATH"
+            exit 1
+          fi
+
+      # 5. 复制 ISO 到工作目录（容器内路径可能不可直接访问）
+      - name: Copy ISO to workspace
+        run: |
+          cp /root/openstack-dalmatian-offline.iso $GITHUB_WORKSPACE/
+          ls -lh $GITHUB_WORKSPACE/openstack-dalmatian-offline.iso
+
+      # 6. 创建 GitHub Release 并上传 ISO
+      - name: Create Release and Upload ISO
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "OpenStack Dalmatian Offline ISO ${{ github.ref_name }}"
+          body: |
+            ## OpenStack Dalmatian 离线 ISO
+            
+            **版本**: ${{ github.ref_name }}
+            **构建时间**: ${{ github.event.head_commit.timestamp }}
+            **文件大小**: ${{ steps.iso_info.outputs.size }}
+            **SHA256**: `${{ steps.iso_info.outputs.sha256 }}`
+            
+            ### 使用方法
+            
+            ```bash
+            # 1. 下载 ISO
+            wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/openstack-dalmatian-offline.iso
+            
+            # 2. 挂载 ISO
+            mount -o loop openstack-dalmatian-offline.iso /root/openstack-offline
+            
+            # 3. 运行部署
+            bash openstack_all.sh
+            # 选择 [01] → 选择 [2] 离线部署 → 输入 ISO 路径 → [A] 一键部署
+            ```
+            
+            ### 内容
+            
+            - CentOS Stream 9 RPM 包（OpenStack Dalmatian 依赖）
+            - MariaDB、RabbitMQ、Memcached
+            - Keystone、Glance、Placement、Nova、Neutron、Horizon、Cinder、Swift
+            - 已过滤 openssl 系统库（避免 SSH 中断）
+          
+          files: |
+            openstack-dalmatian-offline.iso
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 7. 上传 ISO 为 Artifact（备份）
+      - name: Upload ISO as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openstack-dalmatian-offline-iso
+          path: openstack-dalmatian-offline.iso
+          retention-days: 90
+          compression-level: 0  # ISO 已压缩，无需再压缩
+
+      # 8. 输出构建信息
+      - name: Print build summary
+        run: |
+          echo "## 🎉 ISO 构建完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 项目 | 值 |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| 版本 | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 文件大小 | ${{ steps.iso_info.outputs.size }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SHA256 | \`${{ steps.iso_info.outputs.sha256 }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 下载地址 | [点击下载](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/openstack-dalmatian-offline.iso) |" >> $GITHUB_STEP_SUMMARY
