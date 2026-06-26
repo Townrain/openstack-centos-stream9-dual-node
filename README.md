@@ -93,7 +93,7 @@
 
 ```bash
 # 在控制节点以 root 执行
-bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v5/openstack_all.sh")
+bash <(curl -sSL "https://raw.githubusercontent.com/Townrain/openstack-centos-stream9-dual-node/main/v6/openstack_all.sh")
 ```
 
 → 选择 `[A]` 一键部署全部 9 个模块，脚本自动完成所有配置。
@@ -129,7 +129,8 @@ bash openstack_all.sh
 # [01] 基础环境     [04] Placement    [07] Horizon
 # [02] Keystone      [05] Nova         [08] Cinder
 # [03] Glance        [06] Neutron      [09] Swift
-# [A]  一键全部      [V]  验证全部      [Q]  退出
+# [A]  一键全部      [V]  验证全部      [C]  完整清理
+# [Q]  退出
 ```
 
 ### 非交互模式（批量部署）
@@ -243,6 +244,17 @@ swift stat                        # Swift 对象存储
 
 所有脚本内置 root 权限检查，非 root 用户执行时自动拒绝并提示，避免权限不足导致的半成品状态。
 
+### 完整清理
+
+```bash
+bash openstack_all.sh → [C]   # 按部署逆序清理全部组件
+```
+
+清理脚本按 **Swift → Cinder → Horizon → Neutron → Nova → Placement → Glance → Keystone → 基础环境** 的逆序移除所有部署产物，支持：
+
+- **分段清理**: `bash openstack_cleanup.sh --section <name>`
+- **强制模式**: `bash openstack_cleanup.sh --force`
+- **远程清理**: 自动 SSH 清理计算节点
 ---
 
 ## ❓ 常见问题
@@ -336,12 +348,16 @@ source /root/openstack_common.sh && restore_network_repos
 │   ├── 📜 openstack_cinder_verify.sh
 │   └── 📜 openstack_swift_verify.sh
 │
+├── 清理脚本
+│   ├── 📜 openstack_cleanup.sh          # 完整清理（950行，逆序卸载全部）
+│   └── 📜 openstack_cleanup_verify.sh   # 清理验证（107行）
+│
 ├── 🛠  build-openstack-offline-iso.sh  # 离线 ISO 构建（60+包+全量依赖）
 ├── 💿 cirros.img                      # 测试镜像
 ├── 📖 README.md
 ```
 
-**代码量**: ~6500 行 Shell | **配置项**: 30+ | **检查点**: 100+ | **支持8大OpenStack核心组件**
+**代码量**: ~7500 行 Shell | **配置项**: 30+ | **检查点**: 100+ | **支持8大OpenStack核心组件**
 
 ---
 
